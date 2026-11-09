@@ -1,0 +1,321 @@
+#include <ESP32Servo.h>
+
+Servo servoBase;
+Servo servoDireita;
+Servo servoEsquerda;
+Servo servoGarra;
+Servo servoFunil;
+
+// Pinos dos servos
+int pinBase = 5;
+int pinDireita = 17;
+int pinEsquerda = 16;
+int pinGarra = 4;
+int pinFunil = 21;
+
+// Variáveis dos movimentos
+int Base = 0;
+int Esquerda = 0;
+int Direita = 0;
+
+// Sensores e relé
+int pinoSensor1 = 35;
+int pinoSensor2 = 33;
+int pinoRelay = 22;
+
+// Botão
+int botaoLiga = 32;
+
+// Controle
+bool botaoAnterior = HIGH;
+bool aguardandoSensor2 = false;
+bool operacaoEmAndamento = false;
+
+void setup() {
+
+  pinMode(botaoLiga, INPUT_PULLUP);
+  pinMode(pinoSensor1, INPUT);
+  pinMode(pinoSensor2, INPUT);
+  pinMode(pinoRelay, OUTPUT);
+
+  // Esteira desligada
+  digitalWrite(pinoRelay, LOW);
+
+  // Configuração dos servos
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  servoBase.setPeriodHertz(50);
+  servoDireita.setPeriodHertz(50);
+  servoEsquerda.setPeriodHertz(50);
+  servoGarra.setPeriodHertz(50);
+  servoFunil.setPeriodHertz(50);
+
+  servoBase.attach(pinBase, 500, 2400);
+  servoDireita.attach(pinDireita, 500, 2400);
+  servoEsquerda.attach(pinEsquerda, 500, 2400);
+  servoGarra.attach(pinGarra, 500, 2400);
+  servoFunil.attach(pinFunil, 500, 2400);
+
+  // Posições iniciais
+  servoFunil.write(0);
+
+  servoDireita.write(90);
+  delay(300);
+
+  servoBase.write(90);
+  delay(300);
+
+  servoEsquerda.write(20);
+  delay(300);
+
+  servoGarra.write(90);
+
+  delay(1000);
+}
+
+void loop() {
+
+  // =====================================
+  // SENSOR 2 - DESLIGA A ESTEIRA E PEGA A CAIXA
+  // =====================================
+
+  if (aguardandoSensor2) {
+
+    if (analogRead(pinoSensor2) <= 200) {
+
+      digitalWrite(pinoRelay, LOW);
+
+      aguardandoSensor2 = false;
+      operacaoEmAndamento = true;   // mantém travado durante o movimento
+
+      // BASE vai até o sensor 2
+      for (Base = 90; Base >= 45; Base--) {
+        servoBase.write(Base);
+        delay(15);
+      }
+      delay(300);
+
+      // ESQUERDA avança
+      for (Esquerda = 20; Esquerda < 37; Esquerda++) {
+        servoEsquerda.write(Esquerda);
+        delay(15);
+      }
+      delay(500);
+
+      // DIREITA desce
+      for (Direita = 90; Direita < 145; Direita++) {
+        servoDireita.write(Direita);
+        delay(15);
+      }
+      delay(300);
+
+      // GARRA fecha na caixa
+      servoGarra.write(108);
+      delay(500);
+
+      // ---------------------------------
+      // RETORNO À POSIÇÃO INICIAL
+      // (segurando a caixa; apague este trecho se for
+      //  fazer o movimento até o caminhão)
+      // ---------------------------------
+
+      for (Direita = 169; Direita >= 90; Direita--) {
+        servoDireita.write(Direita);
+        delay(15);
+      }
+      delay(300);
+
+      for (Esquerda = 69; Esquerda >= 20; Esquerda--) {
+        servoEsquerda.write(Esquerda);
+        delay(15);
+      }
+      delay(300);
+
+      for (Base = 28; Base <= 90; Base++) {
+        servoBase.write(Base);
+        delay(15);
+      }
+      delay(300);
+
+      operacaoEmAndamento = false;
+    }
+  }
+
+  // =====================================
+  // BOTÃO DE PARTIDA
+  // =====================================
+
+  bool botaoAtual = digitalRead(botaoLiga);
+
+  if (botaoAnterior == HIGH &&
+      botaoAtual == LOW &&
+      !operacaoEmAndamento &&
+      !aguardandoSensor2) {
+
+    delay(40);
+
+    if (digitalRead(botaoLiga) == LOW) {
+
+      operacaoEmAndamento = true;
+
+      // =====================================
+      // MOVIMENTO 1 - BASE
+      // =====================================
+
+      for (Base = 90; Base < 176; Base++) {
+        servoBase.write(Base);
+        delay(15);
+      }
+
+      delay(300);
+
+      // =====================================
+      // MOVIMENTO 2 - GARRA
+      // =====================================
+
+      servoGarra.write(130);
+
+      // =====================================
+      // MOVIMENTO 3 - ESQUERDA
+      // =====================================
+
+      for (Esquerda = 20; Esquerda >= 0; Esquerda--) {
+        servoEsquerda.write(Esquerda);
+        delay(15);
+      }
+
+      delay(300);
+
+      // =====================================
+      // MOVIMENTO 4 - DIREITA
+      // =====================================
+
+      for (Direita = 90; Direita < 176; Direita++) {
+        servoDireita.write(Direita);
+        delay(15);
+      }
+
+      delay(300);
+
+      servoGarra.write(108);
+      delay(500);
+
+      // =====================================
+      // RETORNO DA DIREITA
+      // =====================================
+
+      for (Direita = 175; Direita >= 90; Direita--) {
+        servoDireita.write(Direita);
+        delay(15);
+      }
+
+      delay(300);
+
+      // =====================================
+      // RETORNO DA ESQUERDA
+      // =====================================
+
+      for (Esquerda = 0; Esquerda < 21; Esquerda++) {
+        servoEsquerda.write(Esquerda);
+        delay(15);
+      }
+
+      delay(300);
+
+      // =====================================
+      // MOVIMENTO DA BASE
+      // =====================================
+
+      for (Base = 175; Base >= 142; Base--) {
+        servoBase.write(Base);
+        delay(15);
+      }
+
+      delay(300);
+
+      // =====================================
+      // MOVIMENTO DA ESQUERDA
+      // =====================================
+
+      for (Esquerda = 20; Esquerda < 60; Esquerda++) {
+        servoEsquerda.write(Esquerda);
+        delay(15);
+      }
+
+      delay(500);
+
+      // =====================================
+      // MOVIMENTO DA DIREITA
+      // =====================================
+
+      for (Direita = 90; Direita < 159; Direita++) {
+        servoDireita.write(Direita);
+        delay(15);
+      }
+
+      delay(300);
+
+      servoGarra.write(150);
+      delay(300);
+
+      // =====================================
+      // SENSOR 1 - DETECTA OBJETO
+      // =====================================
+
+      if (analogRead(pinoSensor1) <= 100) {
+
+        // 1. RETORNO DA DIREITA
+        for (Direita = 158; Direita >= 90; Direita--) {
+          servoDireita.write(Direita);
+          delay(15);
+        }
+
+        delay(300);
+
+        // 2. RETORNO DA ESQUERDA
+        for (Esquerda = 59; Esquerda >= 20; Esquerda--) {
+          servoEsquerda.write(Esquerda);
+          delay(15);
+        }
+
+        delay(300);
+
+        // 3. RETORNO DA BASE
+        for (Base = 142; Base >= 90; Base--) {
+          servoBase.write(Base);
+          delay(15);
+        }
+
+        delay(300);
+
+        // 4. ABRE O FUNIL
+        servoFunil.write(90);
+
+        delay(2000);
+
+        // 5. FECHA O FUNIL
+        servoFunil.write(0);
+
+        delay(300);
+
+        // 6. LIGA A ESTEIRA
+        digitalWrite(pinoRelay, HIGH);
+
+        aguardandoSensor2 = true;
+      }
+      else {
+
+        // Sensor 1 não detectou:
+        // libera uma nova tentativa pelo botão
+        operacaoEmAndamento = false;
+      }
+    }
+  }
+
+  botaoAnterior = digitalRead(botaoLiga);
+
+  delay(20);
+}
